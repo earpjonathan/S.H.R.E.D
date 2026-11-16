@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CardCutter</title>
+<style>
+:root {
+  --bg: #f4f3ef; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6a64; --line: #dcdad2;
+  --accent: #2f5d8a; --accent-ink: #ffffff; --warn-bg: #fff5d6; --warn-ink: #6b4e00;
+  --err-bg: #fde8e6; --err-ink: #8a1c12; --ok: #2e6b3a; --chip: #ecebe5;
+  --paper: #ffffff; --paper-ink: #000000;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1b1c1e; --panel: #24262a; --ink: #e8e6e1; --muted: #a09e98; --line: #3a3c41;
+    --accent: #7fb0e0; --accent-ink: #10202f; --warn-bg: #3a3218; --warn-ink: #f0d78a;
+    --err-bg: #3d1f1c; --err-ink: #f4b4ab; --ok: #8fd19e; --chip: #30333a;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+       font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+header { display: flex; align-items: center; gap: 16px; padding: 10px 20px; border-bottom: 1px solid var(--line);
+         background: var(--panel); position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
+header h1 { font-size: 16px; margin: 0; letter-spacing: .2px; }
+nav button { background: none; border: 0; padding: 6px 10px; border-radius: 6px; color: var(--muted); cursor: pointer; font: inherit; }
+nav button.on { background: var(--chip); color: var(--ink); font-weight: 600; }
+#status { margin-left: auto; color: var(--muted); font-size: 12.5px; }
+main { display: grid; grid-template-columns: 360px 1fr; gap: 20px; padding: 20px; align-items: start; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 16px; } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.inputs { position: sticky; top: 64px; max-height: calc(100vh - 84px); overflow: auto; }
+@media (max-width: 900px) { .inputs { position: static; max-height: none; } }
+label { display: block; font-weight: 600; font-size: 12.5px; margin: 14px 0 5px; }
+label:first-child { margin-top: 0; }
+.hint { color: var(--muted); font-weight: 400; }
+textarea, input[type=text], input[type=url], select {
+  width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 7px 9px; }
+textarea { resize: vertical; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; margin-bottom: 8px; }
+.seg button { border: 0; background: none; padding: 5px 12px; font: inherit; color: var(--muted); cursor: pointer; }
+.seg button.on { background: var(--chip); color: var(--ink); font-weight: 600; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--panel);
+       color: var(--ink); font: inherit; padding: 7px 12px; border-radius: 7px; cursor: pointer; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.small { padding: 3px 8px; font-size: 12.5px; }
+.wide { width: 100%; justify-content: center; margin-top: 16px; }
+.note { color: var(--muted); font-size: 12.5px; margin-top: 6px; white-space: pre-wrap; }
+.error { background: var(--err-bg); color: var(--err-ink); border-radius: 7px; padding: 10px 12px; white-space: pre-wrap; margin-top: 10px; }
+.warn { background: var(--warn-bg); color: var(--warn-ink); border-radius: 7px; padding: 6px 10px; margin: 4px 0; font-size: 12.5px; }
+details summary { cursor: pointer; font-weight: 600; font-size: 12.5px; margin-top: 14px; }
+#progress { margin-top: 14px; font-size: 12.5px; }
+#progress .line { color: var(--muted); }
+#progress .line:last-child { color: var(--ink); font-weight: 600; }
+.spin { display: inline-block; width: 10px; height: 10px; border: 2px solid var(--muted); border-top-color: transparent;
+        border-radius: 50%; animation: s 1s linear infinite; margin-right: 6px; vertical-align: -1px; }
+@keyframes s { to { transform: rotate(360deg); } }
+#drafts { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); }
+@media (max-width: 520px) { #drafts { grid-template-columns: 1fr; } }
+.empty { color: var(--muted); padding: 40px 10px; text-align: center; }
+.draft { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+.draft-head { padding: 10px 14px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.draft-head b { font-size: 13px; }
+.draft-head .why { color: var(--muted); font-size: 12.5px; flex: 1 1 200px; }
+.toolbar { display: flex; gap: 6px; padding: 8px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; align-items: center; }
+.tool { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px; padding: 3px 9px; cursor: pointer; font: inherit; font-size: 12.5px; }
+.tool.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
+.tool kbd { font: 11px ui-monospace, monospace; color: var(--muted); margin-left: 4px; }
+.toolbar .hint { font-size: 12px; margin-left: auto; }
+/* Verbatim-like paper */
+.paper { background: var(--paper); color: var(--paper-ink); padding: 14px 18px; font-family: Calibri, Carlito, "Segoe UI", Arial, sans-serif;
+         font-size: 11pt; line-height: 1.32; max-height: 70vh; overflow: auto; }
+.paper .tag { font-size: 13pt; font-weight: bold; margin-bottom: 4px; outline: none; border-radius: 3px; }
+.paper .tag:focus { box-shadow: 0 0 0 2px #9cc3ea; }
+.paper .cite { margin-bottom: 8px; }
+.paper .c13 { font-weight: bold; font-size: 13pt; }
+.paper .body p { margin: 0 0 7px; white-space: pre-wrap; }
+.paper .body { cursor: text; user-select: text; }
+.u { text-decoration: underline; }
+.e { font-weight: bold; text-decoration: underline; outline: 1px solid #000; outline-offset: -1px; }
+.miss { color: #b3261e; font-weight: bold; }
+.citeform { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--line); }
+.citeform input, .citeform select { font-size: 12.5px; padding: 5px 7px; }
+.citeform .full { grid-column: 1 / -1; }
+.meta { padding: 10px 14px; border-top: 1px solid var(--line); font-size: 12.5px; }
+.meta .read { color: var(--ink); margin-top: 4px; }
+.meta .stats { color: var(--muted); margin-top: 4px; }
+.scores { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.chip { background: var(--chip); border-radius: 999px; padding: 2px 9px; font-size: 12px; }
+.chip.low { background: var(--err-bg); color: var(--err-ink); }
+.export { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 700px) { .export { grid-template-columns: 1fr; } }
+.export .panel { display: flex; flex-direction: column; gap: 8px; }
+.export h3, .panel h3 { margin: 0; font-size: 13px; }
+.gaps li { margin: 4px 0; cursor: pointer; }
+.gaps li:hover { text-decoration: underline; }
+.outline { white-space: pre; font: 11.5px ui-monospace, monospace; max-height: 200px; overflow: auto; background: var(--bg); padding: 8px; border-radius: 6px; }
+#sources { margin-bottom: 16px; }
+#sources .panel { padding: 12px 14px; }
+.src { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: start; padding: 8px 0; border-top: 1px solid var(--line); }
+.src:first-of-type { border-top: 0; }
+.src .n { color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 2px; }
+.src a { color: var(--ink); font-weight: 600; text-decoration: none; }
+.src a:hover { text-decoration: underline; }
+.src .sub { color: var(--muted); font-size: 12.5px; }
+.src .snip { color: var(--muted); font-size: 12px; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.src .state { font-size: 12px; color: var(--ok); white-space: nowrap; }
+.draft-head a { color: var(--ink); }
+/* A/B */
+#ab { display: none; padding: 20px; max-width: 900px; margin: 0 auto; }
+#ab .evidence { background: var(--paper); color: var(--paper-ink); padding: 14px 18px; border-radius: 8px; max-height: 45vh; overflow: auto;
+                font-family: Calibri, Carlito, Arial, sans-serif; font-size: 11pt; margin: 12px 0; }
+#ab .evidence p { margin: 0 0 7px; }
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 600px) { .choices { grid-template-columns: 1fr; } }
+.choice { text-align: left; font-size: 14px; font-weight: 600; padding: 14px; min-height: 80px; }
+.choice small { display: block; color: var(--muted); font-weight: 400; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>CardCutter</h1>
+  <nav><button id="nav-cut" class="on">Cut</button><button id="nav-ab">Tag A/B</button></nav>
+  <div id="status">loading…</div>
+</header>
+
+<main id="cut">
+  <section class="panel inputs">
+    <label for="claim">Claim <span class="hint">what the card must prove</span></label>
+    <textarea id="claim" rows="3" placeholder="e.g. Legal certainty draws private biotech investment"></textarea>
+
+    <div class="seg" id="mode" style="margin-top:12px"><button data-m="auto" class="on">Find sources for me</button><button data-m="manual">Use my own source</button></div>
+
+    <div data-mode="auto">
+      <div class="note" style="margin-top:0">Searches the web, news, and open-access journals, reads the best articles, and cuts one card from each of the strongest (one per site).</div>
+    </div>
+
+    <div data-mode="manual" hidden>
+      <div class="seg" id="srcmode"><button data-m="text" class="on">Paste</button><button data-m="file">PDF / file</button><button data-m="url">URL</button></div>
+      <div data-src="text"><textarea id="src-text" rows="6" placeholder="Paste the article text"></textarea></div>
+      <div data-src="file" hidden><input type="file" id="src-file" accept=".pdf,.txt,.md"></div>
+      <div data-src="url" hidden><input type="url" id="src-url" placeholder="https://…"></div>
+      <button class="btn small" id="load" style="margin-top:8px">Load source</button>
+      <div class="note" id="src-note"></div>
+    </div>
+
+    <label for="role">Card's role <span class="hint">optional</span></label>
+    <input type="text" id="role" placeholder="e.g. internal link: legal certainty → investment">
+
+    <label>Case file <span class="hint">optional .docx, so the card fills a gap</span></label>
+    <input type="file" id="ctx-file" accept=".docx">
+    <div id="ctx-box" hidden>
+      <details><summary id="ctx-name">Outline</summary><div class="outline" id="ctx-outline"></div></details>
+      <button class="btn small" id="suggest" style="margin-top:8px">Suggest missing links</button>
+      <ul class="gaps note" id="gaps"></ul>
+    </div>
+
+    <div class="row">
+      <div><label for="cands" id="cands-label">Cards</label><select id="cands"><option>1</option><option>2</option><option selected>3</option></select></div>
+      <div><label for="density">Density</label><select id="density"></select></div>
+    </div>
+    <div class="row">
+      <div><label for="citefmt">Cite format</label><select id="citefmt"><option value="inline">inline</option><option value="bracketed">bracketed</option></select></div>
+      <div><label for="preset">Models</label><select id="preset"></select></div>
+    </div>
+    <label style="font-weight:400"><input type="checkbox" id="retrieval" checked> Show the model similar cards from the examples</label>
+
+    <details data-mode="manual" hidden><summary>Cite fields <span class="hint">(override what the article gives)</span></summary>
+      <label for="o-authors">Author(s) <span class="hint">; separated</span></label><input type="text" id="o-authors">
+      <label for="o-quals">Qualifications <span class="hint">; separated, one per author</span></label><input type="text" id="o-quals">
+      <div class="row"><div><label for="o-date">Date</label><input type="text" id="o-date" placeholder="2026-01-07"></div>
+        <div><label for="o-publication">Publication</label><input type="text" id="o-publication"></div></div>
+      <label for="o-title">Title</label><input type="text" id="o-title">
+      <label for="o-url">URL</label><input type="text" id="o-url">
+    </details>
+
+    <button class="btn primary wide" id="auto" data-mode="auto">Find sources &amp; cut cards</button>
+    <button class="btn primary wide" id="go" data-mode="manual" hidden disabled>Cut card</button>
+    <div id="progress"></div>
+  </section>
+
+  <section>
+    <div id="sources" hidden></div>
+    <div id="drafts"><div class="empty">Write the claim and press “Find sources &amp; cut cards”, or switch to “Use my own source”.
+      Cards show up here side by side as they finish; select text (or click a word) to change highlighting,
+      underlining, and emphasis.</div></div>
+    <div class="export" id="export" hidden>
+      <div class="panel"><h3>New file</h3>
+        <input type="text" id="fname" value="cards.docx">
+        <button class="btn primary" id="dl">Download .docx</button></div>
+      <div class="panel"><h3>Append to an existing file</h3>
+        <input type="text" id="apath" placeholder="/Users/you/Debate/aff.docx">
+        <input type="text" id="aheading" placeholder="Heading to append under">
+        <button class="btn" id="append">Append</button></div>
+    </div>
+    <div id="export-note"></div>
+  </section>
+</main>
+
+<section id="ab">
+  <div class="panel">
+    <h3>Blind tag test</h3>
+    <div class="note">Two tags for the same evidence: one the model wrote, one a human wrote. Pick the better one; which is which is shown after you vote.</div>
+    <label for="ab-run">Eval run</label><select id="ab-run"></select>
+    <div id="ab-tally" class="note"></div>
+    <div id="ab-card"></div>
+  </div>
+</section>
+
+<script>
+"use strict";
+const $ = (s, el = document) => el.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v; else if (k === "text") n.textContent = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
+  }
+  for (const k of kids) if (k != null) n.append(k);
+  return n;
+};
+let INFO = {}, DOC = null, CTX = null, DRAFTS = [], ACTIVE = null;
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, opts);
+  let body = null;
+  try { body = await r.json(); } catch (_) { body = {}; }
+  if (r.status === 409 || r.status === 402) return { confirm: body.confirm, question: body.question, status: r.status };
+  if (!r.ok) throw new Error(body.detail || `HTTP ${r.status}`);
+  return body;
+}
+const post = (path, data) => api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+
+// ---------- setup ----------
+async function init() {
+  INFO = await api("/api/info");
+  for (const d of INFO.densities) $("#density").append(el("option", { value: d, text: d }));
+  $("#density").value = INFO.density;
+  for (const p of INFO.presets) $("#preset").append(el("option", { value: p, text: p }));
+  $("#preset").value = INFO.preset;
+  $("#citefmt").value = INFO.cite_format;
+  $("#retrieval").checked = INFO.retrieval;
+  updateStatus();
+}
+function updateStatus(spent) {
+  const s = INFO.stages || {};
+  const main = s.underline || "?";
+  $("#status").textContent = `${main}${spent != null ? ` · spent $${Number(spent).toFixed(4)}` : ""}`;
+  $("#status").title = Object.entries(s).map(([k, v]) => `${k}: ${v}`).join("\n");
+}
+
+// ---------- mode ----------
+let MODE = "auto";
+for (const b of document.querySelectorAll("#mode button")) b.onclick = () => {
+  MODE = b.dataset.m;
+  document.querySelectorAll("#mode button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll("[data-mode]").forEach(x => x.hidden = x.dataset.mode !== MODE);
+  $("#cands-label").textContent = MODE === "auto" ? "Cards" : "Candidates";
+};
+
+// ---------- source ----------
+let srcMode = "text";
+for (const b of document.querySelectorAll("#srcmode button")) b.onclick = () => {
+  srcMode = b.dataset.m;
+  document.querySelectorAll("#srcmode button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll("[data-src]").forEach(x => x.hidden = x.dataset.src !== srcMode);
+};
+$("#load").onclick = async () => {
+  const fd = new FormData();
+  if (srcMode === "text") fd.append("text", $("#src-text").value);
+  if (srcMode === "url") fd.append("url", $("#src-url").value);
+  if (srcMode === "file" && $("#src-file").files[0]) fd.append("file", $("#src-file").files[0]);
+  $("#src-note").textContent = "loading…";
+  try {
+    DOC = await api("/api/source", { method: "POST", body: fd });
+    const m = DOC.meta, bits = [];
+    if (m.authors.length) bits.push(m.authors.join("; "));
+    if (m.date) bits.push(m.date);
+    if (m.title) bits.push(`“${m.title}”`);
+    if (m.publication) bits.push(m.publication);
+    $("#src-note").textContent = `${DOC.kind}: ${DOC.paragraphs.length} paragraphs, ${DOC.words} words` + (bits.length ? `\n${bits.join(" · ")}` : "");
+    $("#go").disabled = false;
+  } catch (e) { $("#src-note").textContent = ""; showError($("#src-note"), e.message); }
+};
+
+// ---------- case file ----------
+$("#ctx-file").onchange = async () => {
+  const f = $("#ctx-file").files[0]; if (!f) return;
+  const fd = new FormData(); fd.append("file", f);
+  try {
+    CTX = await api("/api/context", { method: "POST", body: fd });
+    $("#ctx-box").hidden = false;
+    $("#ctx-name").textContent = `Outline of ${CTX.name}`;
+    $("#ctx-outline").textContent = CTX.outline;
+  } catch (e) { alert(e.message); }
+};
+$("#suggest").onclick = async () => {
+  const res = await withConfirm(flags => post("/api/suggest", { context_id: CTX.context_id, preset: $("#preset").value, ...flags }));
+  if (!res) return;
+  const job = await follow(res.id, $("#gaps"));
+  if (!job || job.status !== "done") return;
+  const ul = $("#gaps"); ul.replaceChildren();
+  for (const g of job.result.gaps) {
+    ul.append(el("li", { title: "use this as the claim", onclick: () => { $("#claim").value = g.claim; $("#role").value = `${g.kind} under “${g.where}”`; } },
+      el("b", { text: `[${g.kind}] ` }), `${g.claim} `, el("span", { class: "hint", text: `(under ${g.where})` })));
+  }
+};
+
+// ---------- jobs ----------
+async function withConfirm(send) {
+  let flags = { allow_fallback: false, allow_paid: false };
+  for (let i = 0; i < 3; i++) {
+    const r = await send(flags);
+    if (!r.confirm) return r;
+    if (!window.confirm(r.question)) return null;
+    if (r.confirm === "fallback") flags.allow_fallback = true; else flags.allow_paid = true;
+  }
+  return null;
+}
+async function follow(jobId, box, onUpdate) {
+  const prog = box || $("#progress");
+  for (;;) {
+    const j = await api(`/api/jobs/${jobId}`);
+    if (onUpdate) onUpdate(j);
+    prog.replaceChildren();
+    if (j.status === "queued" || j.status === "running") {
+      const lines = j.log.slice(-6);
+      prog.append(el("div", { class: "line" }, el("span", { class: "spin" }), `working… ${Math.round(j.seconds)}s`));
+      for (const l of lines) prog.append(el("div", { class: "line", text: l }));
+      await new Promise(r => setTimeout(r, 900));
+      continue;
+    }
+    if (j.status === "error") showError(prog, j.error);
+    else prog.append(el("div", { class: "note", text: `done in ${Math.round(j.seconds)}s` }));
+    return j;
+  }
+}
+function showError(box, msg) { box.append(el("div", { class: "error", text: msg })); }
+
+$("#go").onclick = async () => {
+  if (!DOC) return;
+  const overrides = {};
+  for (const k of ["authors", "quals", "date", "title", "publication", "url"]) {
+    const v = $(`#o-${k}`).value.trim(); if (v) overrides[k] = v;
+  }
+  const req = {
+    doc_id: DOC.doc_id, claim: $("#claim").value, role: $("#role").value,
+    context_id: CTX ? CTX.context_id : null, candidates: +$("#cands").value, density: $("#density").value,
+    cite_format: $("#citefmt").value, preset: $("#preset").value, retrieval: $("#retrieval").checked, overrides,
+  };
+  $("#go").disabled = true; $("#progress").replaceChildren();
+  try {
+    const res = await withConfirm(flags => post("/api/cut", { ...req, ...flags }));
+    if (!res) return;
+    const job = await follow(res.id);
+    if (job.status === "done") { $("#sources").hidden = true; setDrafts(job.result.drafts); updateStatus(job.result.spent_usd); }
+  } catch (e) { showError($("#progress"), e.message); }
+  finally { $("#go").disabled = false; }
+};
+
+// ---------- automatic: find sources and cut ----------
+let SOURCES = [], SRC_STATE = {};
+$("#auto").onclick = async () => {
+  const claim = $("#claim").value.trim();
+  if (!claim) { $("#claim").focus(); return; }
+  const req = {
+    claim, role: $("#role").value, context_id: CTX ? CTX.context_id : null, cards: +$("#cands").value,
+    density: $("#density").value, cite_format: $("#citefmt").value, preset: $("#preset").value, retrieval: $("#retrieval").checked,
+  };
+  $("#auto").disabled = true; $("#progress").replaceChildren();
+  SOURCES = []; SRC_STATE = {}; setDrafts([]); renderSources();
+  let shown = 0;
+  try {
+    const res = await withConfirm(flags => post("/api/auto", { ...req, ...flags }));
+    if (!res) return;
+    const job = await follow(res.id, null, j => {
+      const r = j.result; if (!r) return;
+      if (r.sources && r.sources.length !== SOURCES.length) { SOURCES = r.sources; renderSources(); }
+      for (; shown < r.drafts.length; shown++) { addDraft(r.drafts[shown]); SRC_STATE[r.drafts[shown].source.id] = "cut"; renderSources(); }
+      if (r.spent_usd != null) updateStatus(r.spent_usd);
+    });
+    if (job.status === "done" && job.result.skipped.length)
+      $("#progress").append(el("div", { class: "note", text: "Skipped: " + job.result.skipped.join("; ") }));
+  } catch (e) { showError($("#progress"), e.message); }
+  finally { $("#auto").disabled = false; }
+};
+async function cutSource(src) {
+  const claim = $("#claim").value.trim();
+  if (!claim) { $("#claim").focus(); return; }
+  SRC_STATE[src.id] = "cutting…"; renderSources();
+  try {
+    const res = await withConfirm(flags => post("/api/cut", {
+      doc_id: src.id, claim, role: $("#role").value, context_id: CTX ? CTX.context_id : null, candidates: 1,
+      density: $("#density").value, cite_format: $("#citefmt").value, preset: $("#preset").value,
+      retrieval: $("#retrieval").checked, overrides: {}, ...flags }));
+    if (!res) { delete SRC_STATE[src.id]; renderSources(); return; }
+    const job = await follow(res.id);
+    if (job.status === "done") { job.result.drafts.forEach(addDraft); SRC_STATE[src.id] = "cut"; updateStatus(job.result.spent_usd); }
+    else SRC_STATE[src.id] = "failed";
+  } catch (e) { SRC_STATE[src.id] = "failed"; showError($("#progress"), e.message); }
+  renderSources();
+}
+function renderSources() {
+  const box = $("#sources");
+  box.hidden = !SOURCES.length;
+  if (!SOURCES.length) { box.replaceChildren(); return; }
+  const panel = el("div", { class: "panel" });
+  const det = el("details", SOURCES.length ? { open: "" } : {});
+  det.append(el("summary", { text: `Sources found (${SOURCES.length}) — best match first`, style: "margin:0" }));
+  SOURCES.forEach((x, k) => {
+    const sub = [x.publication || x.domain, x.date ? x.date.slice(0, 10) : "", x.authors.length ? x.authors.join(", ") : "", `${x.words} words`, x.provider]
+      .filter(Boolean).join(" · ");
+    const state = SRC_STATE[x.id];
+    const action = state ? el("span", { class: "state", text: state === "cut" ? "✓ cut" : state })
+                         : el("button", { class: "btn small", text: "Cut this", onclick: () => cutSource(x) });
+    det.append(el("div", { class: "src" },
+      el("span", { class: "n", text: String(k + 1) }),
+      el("div", {},
+        el("a", { href: x.url, target: "_blank", rel: "noopener noreferrer", text: x.title || x.url }),
+        el("div", { class: "sub", text: `${sub} · match ${(x.relevance * 100).toFixed(0)}` }),
+        el("div", { class: "snip", text: x.snippet })),
+      action));
+  });
+  panel.append(det);
+  box.replaceChildren(panel);
+}
+
+// ---------- formatting model (per-character arrays, like the Python FText) ----------
+function expand(ft, attr, fill) {
+  const a = new Array(ft.text.length).fill(fill);
+  for (const s of (ft.marks[attr] || [])) for (let i = s[0]; i < s[1]; i++) a[i] = s.length > 2 ? s[2] : true;
+  return a;
+}
+function spans(arr) {
+  const out = [];
+  for (let i = 0; i < arr.length;) {
+    const v = arr[i];
+    if (v === false || v === null || v === undefined) { i++; continue; }
+    let j = i + 1; while (j < arr.length && arr[j] === v) j++;
+    out.push(v === true ? [i, j] : [i, j, v]); i = j;
+  }
+  return out;
+}
+const isWS = ch => /\s/.test(ch);
+
+function makeDraft(d, n) {
+  const b = d.card.body;
+  return {
+    n, raw: d, meta: d.card.meta, text: b.text, otherMarks: b.marks,
+    ul: expand(b, "underline", false), hl: expand(b, "highlight", null), em: expand(b, "emphasis", false),
+    size: expand(b, "size", null),
+    tag: d.card.tag, cite: d.card.cite, citeMissing: d.cite_missing, history: [], include: true,
+  };
+}
+
+function normalize(d) {
+  // whitespace between two marked words is marked; elsewhere it isn't (matches the cutter's masks)
+  const t = d.text;
+  for (const key of ["ul", "hl", "em"]) {
+    const a = d[key];
+    for (let i = 0; i < t.length;) {
+      if (!isWS(t[i]) || t[i] === "\n") { i++; continue; }
+      let j = i; while (j < t.length && isWS(t[j]) && t[j] !== "\n") j++;
+      const left = i > 0 && t[i - 1] !== "\n" ? a[i - 1] : null, right = j < t.length && t[j] !== "\n" ? a[j] : null;
+      const on = !!left && !!right;
+      for (let k = i; k < j; k++) a[k] = on ? (key === "hl" ? left : true) : (key === "hl" ? null : false);
+      i = j;
+    }
+    for (let i = 0; i < t.length; i++) if (t[i] === "\n") a[i] = key === "hl" ? null : false;
+  }
+  for (let i = 0; i < t.length; i++) {
+    if (!d.ul[i]) { d.hl[i] = null; d.em[i] = false; }
+    d.size[i] = (!d.ul[i] && t[i] !== "\n" && INFO.shrink_half_points) ? INFO.shrink_half_points : null;
+  }
+}
+
+function applyTool(d, tool, a, b) {
+  if (a > b) [a, b] = [b, a];
+  const idx = []; for (let i = a; i < b; i++) if (!isWS(d.text[i])) idx.push(i);
+  if (!idx.length) return;
+  d.history.push(JSON.stringify([d.ul, d.hl, d.em, d.size]));
+  if (d.history.length > 100) d.history.shift();
+  const color = INFO.highlight_color || "yellow";
+  if (tool === "clear") idx.forEach(i => { d.ul[i] = false; d.hl[i] = null; d.em[i] = false; });
+  else if (tool === "underline") { const on = !idx.every(i => d.ul[i]); idx.forEach(i => { d.ul[i] = on; }); }
+  else if (tool === "highlight") { const on = !idx.every(i => d.hl[i]); idx.forEach(i => { d.hl[i] = on ? color : null; if (on) d.ul[i] = true; }); }
+  else if (tool === "emphasis") { const on = !idx.every(i => d.em[i]); idx.forEach(i => { d.em[i] = on; if (on) d.ul[i] = true; }); }
+  normalize(d);
+  renderBody(d); renderMeta(d);
+}
+function undo(d) {
+  const h = d.history.pop(); if (!h) return;
+  [d.ul, d.hl, d.em, d.size] = JSON.parse(h);
+  renderBody(d); renderMeta(d);
+}
+
+function readAloud(d) {
+  let out = "", gap = false;
+  for (let i = 0; i < d.text.length; i++) {
+    if (d.hl[i]) { if (gap && out) out += " "; out += d.text[i]; gap = false; } else gap = true;
+  }
+  return out.split(/\s+/).filter(Boolean).join(" ");
+}
+function bodyJSON(d) {
+  const marks = { ...d.otherMarks };
+  marks.underline = spans(d.ul); marks.highlight = spans(d.hl); marks.emphasis = spans(d.em); marks.size = spans(d.size);
+  for (const k of Object.keys(marks)) if (!marks[k].length) delete marks[k];
+  return { text: d.text, marks };
+}
+
+// ---------- rendering ----------
+const HL = { yellow: "#ffff00", cyan: "#00ffff", green: "#00ff00", lightGray: "#d3d3d3", magenta: "#ff00ff" };
+function renderFT(ft, container) {
+  container.replaceChildren();
+  const u = expand(ft, "underline", false), c = expand(ft, "cite13", false);
+  for (let i = 0; i < ft.text.length;) {
+    let j = i + 1; while (j < ft.text.length && u[j] === u[i] && c[j] === c[i]) j++;
+    const s = el("span");
+    if (u[i]) s.classList.add("u"); if (c[i]) s.classList.add("c13");
+    for (const part of ft.text.slice(i, j).split(/(\[[a-z]+\?\])/)) {
+      if (!part) continue;
+      s.append(/^\[[a-z]+\?\]$/.test(part) ? el("span", { class: "miss", text: part }) : part);
+    }
+    container.append(s); i = j;
+  }
+}
+function renderBody(d) {
+  const box = d.els.body; box.replaceChildren();
+  const t = d.text; let p = el("p");
+  const key = i => `${d.ul[i] ? 1 : 0}${d.hl[i] || ""}${d.em[i] ? 1 : 0}${d.size[i] || ""}`;
+  for (let i = 0; i < t.length;) {
+    if (t[i] === "\n") { box.append(p); p = el("p"); i++; continue; }
+    let j = i + 1; while (j < t.length && t[j] !== "\n" && key(j) === key(i)) j++;
+    const s = el("span", { "data-s": String(i), text: t.slice(i, j).replace(/\u2028/g, "\n") });
+    if (d.ul[i]) s.classList.add("u");
+    if (d.em[i]) s.classList.add("e");
+    if (d.hl[i]) s.style.background = HL[d.hl[i]] || d.hl[i];
+    if (d.size[i]) s.style.fontSize = `${d.size[i] / 2}pt`;
+    p.append(s); i = j;
+  }
+  box.append(p);
+}
+function renderMeta(d) {
+  const m = d.els.meta; m.replaceChildren();
+  const ra = readAloud(d);
+  const words = t => t.split(/\s+/).filter(Boolean).length;
+  const ulWords = words(d.text.split("").filter((_, i) => d.ul[i]).join(""));
+  m.append(el("div", { class: "read" }, el("b", { text: `Read aloud (${words(ra)} words): ` }), ra || "(nothing highlighted)"));
+  m.append(el("div", { class: "stats", text: `${words(d.text)} words in the card · ${ulWords} underlined · ${words(ra)} highlighted` }));
+  const rb = d.raw.readback;
+  if (rb) {
+    const sc = el("div", { class: "scores" });
+    for (const k of ["grammatical", "coherent", "proves_tag"]) sc.append(el("span", { class: `chip${rb[k] < 4 ? " low" : ""}`, text: `${k.replace("_", " ")} ${rb[k]}/5` }));
+    if (d.history.length) sc.append(el("span", { class: "chip", text: "edited by hand since read-back" }));
+    m.append(sc);
+  }
+  for (const w of d.raw.warnings.concat(d.raw.notes || [])) m.append(el("div", { class: "warn", text: w }));
+  m.append(el("div", { class: "stats", text: `${d.raw.seconds}s · $${d.raw.cost_usd.toFixed(4)} · examples: ${d.raw.examples.length}` }));
+}
+function tagJSON(d) {
+  const text = d.els.tag.innerText.replace(/\s+/g, " ").trim();
+  if (text === d.tag.text) return d.tag;
+  // keep underlined phrases that survive the edit
+  const old = d.tag, u = expand(old, "underline", false), phrases = [];
+  for (let i = 0; i < old.text.length;) { if (!u[i]) { i++; continue; } let j = i; while (j < old.text.length && u[j]) j++; phrases.push(old.text.slice(i, j).trim()); i = j; }
+  const marks = { size: [[0, text.length, 26]], underline: [] };
+  for (const ph of phrases) { const k = ph ? text.indexOf(ph) : -1; if (k >= 0) marks.underline.push([k, k + ph.length]); }
+  if (!marks.underline.length) delete marks.underline;
+  d.tag = { text, marks };
+  return d.tag;
+}
+
+function citeForm(d) {
+  const cm = d.meta.cite_meta || {};
+  const f = el("form", { class: "citeform", hidden: "" });
+  const field = (name, label, val, full) => {
+    const w = el("div", full ? { class: "full" } : {});
+    w.append(el("label", { text: label, style: "margin:4px 0 2px" }), el("input", { type: "text", name, value: val || "" }));
+    return w;
+  };
+  f.append(field("authors", "Author(s) (; separated)", (cm.authors || []).join("; "), true),
+           field("quals", "Qualifications (; separated)", (cm.quals || []).join("; "), true),
+           field("date", "Date", cm.date), field("publication", "Publication", cm.publication),
+           field("title", "Title", cm.title, true), field("url", "URL", cm.url, true));
+  const fmt = el("select", { name: "format" }, el("option", { value: "inline", text: "inline" }), el("option", { value: "bracketed", text: "bracketed" }));
+  fmt.value = $("#citefmt").value;
+  f.append(el("div", {}, fmt), el("div", {}, el("button", { class: "btn small primary", type: "submit", text: "Update cite" })));
+  f.onsubmit = async ev => {
+    ev.preventDefault();
+    const data = Object.fromEntries(new FormData(f).entries());
+    const meta = { ...cm, ...data }; delete meta.format;
+    const res = await post("/api/cite", { meta, format: data.format });
+    d.cite = res.cite; d.meta.cite_meta = res.meta; d.citeMissing = res.missing;
+    renderFT(d.cite, d.els.cite);
+  };
+  return f;
+}
+
+function setDrafts(list) {
+  DRAFTS = [];
+  $("#drafts").replaceChildren();
+  list.forEach(addDraft);
+  $("#export").hidden = !DRAFTS.length;
+}
+function addDraft(raw) {
+  const box = $("#drafts");
+  if (!DRAFTS.length) box.replaceChildren();
+  const d = makeDraft(raw, DRAFTS.length + 1);
+  DRAFTS.push(d);
+  {
+    const c = d.raw.candidate;
+    const tools = el("div", { class: "toolbar" });
+    d.tool = "highlight";
+    for (const [t, label, key] of [["highlight", "Highlight", "H"], ["underline", "Underline", "U"], ["emphasis", "Emphasis", "E"], ["clear", "Clear", "X"]]) {
+      const b = el("button", { class: `tool${t === d.tool ? " on" : ""}`, "data-t": t, onclick: () => setTool(d, t) }, label, el("kbd", { text: key }));
+      tools.append(b);
+    }
+    tools.append(el("button", { class: "tool", onclick: () => undo(d) }, "Undo", el("kbd", { text: "⌘Z" })));
+    tools.append(el("span", { class: "hint", text: "select text or click a word" }));
+    const include = el("input", { type: "checkbox", checked: "" });
+    include.onchange = () => { d.include = include.checked; };
+    const src = d.raw.source;
+    const head = el("div", { class: "draft-head" },
+      el("b", { text: `Card ${d.n}` }),
+      src ? el("a", { href: src.url, target: "_blank", rel: "noopener noreferrer", class: "why", text: `${src.publication || src.domain}: ${src.title}` })
+          : el("span", { class: "why", text: c.rationale }),
+      el("span", { class: "hint", text: `¶${c.start_para + 1}–${c.end_para + 1}, ${c.words} words` }),
+      el("label", { style: "margin:0;font-weight:400" }, include, " export"));
+    const tag = el("div", { class: "tag", contenteditable: "plaintext-only", spellcheck: "true", title: "click to edit the tag" });
+    const cite = el("div", { class: "cite" });
+    const body = el("div", { class: "body" });
+    const paper = el("div", { class: "paper" }, tag, cite, body);
+    const form = citeForm(d);
+    const editCite = el("button", { class: "btn small", style: "margin:8px 14px 0", text: "Edit cite", onclick: () => { form.hidden = !form.hidden; } });
+    const meta = el("div", { class: "meta" });
+    const art = el("article", { class: "draft" }, head, tools, paper, el("div", {}, editCite), form, meta);
+    d.els = { art, tag, cite, body, meta, tools };
+    renderFT(d.tag, tag); renderFT(d.cite, cite); renderBody(d); renderMeta(d);
+    tag.addEventListener("blur", () => { tagJSON(d); renderFT(d.tag, tag); });
+    body.addEventListener("mouseup", () => onBodyMouseUp(d));
+    art.addEventListener("mousedown", () => { ACTIVE = d; });
+    box.append(art);
+  }
+  ACTIVE = ACTIVE || d;
+  $("#export").hidden = false;
+}
+function setTool(d, t) {
+  d.tool = t;
+  d.els.tools.querySelectorAll(".tool[data-t]").forEach(b => b.classList.toggle("on", b.dataset.t === t));
+}
+function posIn(box, node, off) {
+  if (node.nodeType === 3) {
+    const s = node.parentElement && node.parentElement.closest("[data-s]");
+    return s && box.contains(s) ? +s.dataset.s + off : null;
+  }
+  if (!box.contains(node) && node !== box) return null;
+  const kids = node.childNodes;
+  if (off < kids.length) {
+    const k = kids[off];
+    const s = k.nodeType === 1 ? (k.matches("[data-s]") ? k : k.querySelector("[data-s]")) : null;
+    if (s) return +s.dataset.s;
+  }
+  const all = node.querySelectorAll ? node.querySelectorAll("[data-s]") : [];
+  if (all.length) { const last = all[all.length - 1]; return +last.dataset.s + last.textContent.length; }
+  return null;
+}
+function onBodyMouseUp(d) {
+  ACTIVE = d;
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const r = sel.getRangeAt(0);
+  let a = posIn(d.els.body, r.startContainer, r.startOffset), b = posIn(d.els.body, r.endContainer, r.endOffset);
+  if (a == null || b == null) return;
+  if (a === b) {           // a click: the whole word
+    const t = d.text;
+    if (a < t.length && isWS(t[a]) && a > 0) a--;
+    while (a > 0 && !isWS(t[a - 1])) a--;
+    b = a; while (b < t.length && !isWS(t[b])) b++;
+  }
+  sel.removeAllRanges();
+  applyTool(d, d.tool, a, b);
+}
+document.addEventListener("keydown", ev => {
+  if (!ACTIVE || ev.target.closest("input, textarea, select, [contenteditable]")) return;
+  if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "z") { ev.preventDefault(); undo(ACTIVE); return; }
+  if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  const t = { h: "highlight", u: "underline", e: "emphasis", x: "clear" }[ev.key.toLowerCase()];
+  if (!t) return;
+  const sel = window.getSelection();
+  if (sel.rangeCount && !sel.isCollapsed && ACTIVE.els.body.contains(sel.anchorNode)) {
+    const r = sel.getRangeAt(0);
+    const a = posIn(ACTIVE.els.body, r.startContainer, r.startOffset), b = posIn(ACTIVE.els.body, r.endContainer, r.endOffset);
+    sel.removeAllRanges();
+    if (a != null && b != null) { applyTool(ACTIVE, t, a, b); return; }
+  }
+  setTool(ACTIVE, t);
+});
+
+// ---------- export ----------
+function chosenCards() {
+  return DRAFTS.filter(d => d.include).map(d => ({ tag: tagJSON(d), cite: d.cite, body: bodyJSON(d), meta: d.meta }));
+}
+async function doExport(extra) {
+  const note = $("#export-note"); note.replaceChildren();
+  try {
+    const res = await post("/api/export", { doc_id: DOC ? DOC.doc_id : "", cards: chosenCards(), ...extra });
+    note.append(el("div", { class: "note", text: `Wrote ${res.cards} card(s) to ${res.path}` }));
+    if (res.download) { const a = el("a", { href: res.download, download: "" }); document.body.append(a); a.click(); a.remove(); }
+  } catch (e) { showError(note, e.message); }
+}
+$("#dl").onclick = () => doExport({ mode: "new", filename: $("#fname").value });
+$("#append").onclick = () => doExport({ mode: "append", append_path: $("#apath").value, heading: $("#aheading").value });
+
+// ---------- tabs and A/B ----------
+$("#nav-cut").onclick = () => { $("#cut").style.display = ""; $("#ab").style.display = "none"; $("#nav-cut").classList.add("on"); $("#nav-ab").classList.remove("on"); };
+$("#nav-ab").onclick = async () => {
+  $("#cut").style.display = "none"; $("#ab").style.display = "block"; $("#nav-ab").classList.add("on"); $("#nav-cut").classList.remove("on");
+  const runs = await api("/api/ab/runs");
+  const sel = $("#ab-run"); sel.replaceChildren();
+  if (!runs.length) { $("#ab-card").replaceChildren(el("div", { class: "empty", text: "No eval run with generated tags yet. Run `cardcutter eval` first." })); return; }
+  for (const r of runs) sel.append(el("option", { value: r.run, text: `${r.run} (${r.cards} cards)` }));
+  sel.onchange = abNext; abNext();
+};
+function showTally(t) {
+  const n = t.generated + t.human + t.tie;
+  $("#ab-tally").textContent = n ? `So far: model ${t.generated} · human ${t.human} · tie ${t.tie} (${n} votes)` : "No votes yet.";
+}
+async function abNext() {
+  const run = $("#ab-run").value;
+  const q = await api(`/api/ab/next?run=${encodeURIComponent(run)}`);
+  const box = $("#ab-card"); box.replaceChildren();
+  if (q.done) { showTally(q.tally); box.append(el("div", { class: "empty", text: `All ${q.total} cards in this run are rated.` })); return; }
+  const ev = el("div", { class: "evidence" });
+  for (const p of q.paragraphs) ev.append(el("p", { text: p }));
+  const vote = async choice => {
+    const r = await post("/api/ab/vote", { key: q.key, choice });
+    showTally(r.tally);
+    box.append(el("div", { class: "note", text: choice === "tie" ? "Recorded a tie." : `You picked the ${r.winner === "generated" ? "model's" : "human's"} tag.` }));
+    setTimeout(abNext, 900);
+  };
+  box.append(el("div", { class: "note", text: `${q.remaining} of ${q.total} left` }), ev,
+    el("div", { class: "choices" },
+      el("button", { class: "btn choice", onclick: () => vote("A") }, el("small", { text: "Tag A" }), q.A),
+      el("button", { class: "btn choice", onclick: () => vote("B") }, el("small", { text: "Tag B" }), q.B)),
+    el("div", { style: "margin-top:10px;display:flex;gap:8px" },
+      el("button", { class: "btn small", text: "Tie", onclick: () => vote("tie") }),
+      el("button", { class: "btn small", text: "Skip", onclick: abNext })));
+}
+
+init().catch(e => { $("#status").textContent = e.message; });
+</script>
+</body>
+</html>

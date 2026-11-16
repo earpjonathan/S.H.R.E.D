@@ -1,0 +1,159 @@
+{
+ "meta": {
+  "id": "fixture-1",
+  "note": "Hand-written test fixture; illustrative text, not real evidence."
+ },
+ "tag": {
+  "text": "Ocean disputes are existential---only a binding treaty solves",
+  "marks": {
+   "underline": [
+    [
+     19,
+     30
+    ],
+    [
+     40,
+     61
+    ]
+   ],
+   "size": [
+    [
+     0,
+     61,
+     26
+    ]
+   ]
+  }
+ },
+ "cite": {
+  "text": "Rivera 26, Jordan Rivera, Professor of Marine Policy, Example University, \"Fixture Article Title,\" Journal of Test Fixtures, Vol 1, No 2, 01/07/2026, https://example.org/fixture",
+  "marks": {
+   "cite13": [
+    [
+     0,
+     9
+    ]
+   ],
+   "size": [
+    [
+     0,
+     9,
+     26
+    ],
+    [
+     9,
+     177,
+     22
+    ]
+   ]
+  }
+ },
+ "body": {
+  "text": "Scholars have long debated this. Without a binding agreement, competition over marine protected areas will escalate into open conflict, and the collapse of biodiversity would follow. A treaty is the only mechanism that resolves these disputes before they turn violent, according to the authors.\nThe second paragraph keeps going with background that a debater would not read aloud.",
+  "marks": {
+   "underline": [
+    [
+     33,
+     181
+    ],
+    [
+     185,
+     267
+    ]
+   ],
+   "emphasis": [
+    [
+     121,
+     134
+    ],
+    [
+     144,
+     152
+    ],
+    [
+     199,
+     213
+    ]
+   ],
+   "highlight": [
+    [
+     33,
+     60,
+     "yellow"
+    ],
+    [
+     79,
+     80,
+     "yellow"
+    ],
+    [
+     86,
+     87,
+     "yellow"
+    ],
+    [
+     96,
+     97,
+     "yellow"
+    ],
+    [
+     107,
+     134,
+     "yellow"
+    ],
+    [
+     144,
+     155,
+     "yellow"
+    ],
+    [
+     156,
+     160,
+     "yellow"
+    ],
+    [
+     185,
+     213,
+     "yellow"
+    ],
+    [
+     219,
+     242,
+     "yellow"
+    ]
+   ],
+   "size": [
+    [
+     0,
+     33,
+     16
+    ],
+    [
+     33,
+     181,
+     22
+    ],
+    [
+     181,
+     185,
+     16
+    ],
+    [
+     185,
+     267,
+     22
+    ],
+    [
+     267,
+     294,
+     16
+    ],
+    [
+     295,
+     380,
+     16
+    ]
+   ]
+  }
+ }
+}

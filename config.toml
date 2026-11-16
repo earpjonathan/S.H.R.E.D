@@ -1,0 +1,377 @@
+# CardCutter configuration. Paths are relative to this file.
+# API keys never go here: put them in the environment or in a git-ignored .env file.
+
+[llm]
+# local (default, free) | local-thorough | free-hybrid | free-api | hybrid | api
+preset = "local"
+# Offered (never used silently) when a local backend isn't running.
+fallback = "gemini-free"
+# Stop a run before it spends more than this in one session (USD). Remove to disable.
+session_cap_usd = 5.0
+
+# Which backend runs each stage. "default" covers stages not listed.
+[llm.presets.local]
+default = "ollama"
+embed = "ollama-embed"
+
+[llm.presets.local-thorough]
+# Local, with thinking on for the highlight stage: on 10 dev cards highlight F1 rose
+# (see the overnight report) at about 5x the time per card (~5 min instead of ~1).
+default = "ollama"
+highlight = "ollama-think"
+embed = "ollama-embed"
+
+[llm.presets.hybrid]
+default = "ollama"
+tag = "anthropic"
+readback = "anthropic"
+embed = "ollama-embed"
+
+[llm.presets.api]
+# For laptops that can't run a local model: everything through APIs, embeddings too.
+default = "anthropic"
+embed = "gemini-embed"
+
+[llm.presets.free-hybrid]
+# Gemini's free tier for every model call, embeddings on this Mac. Your example cards stay
+# local except the few shown to the model as examples in each prompt. Needs GEMINI_API_KEY
+# in .env (aistudio.google.com/apikey, on a project with no billing attached).
+default = "gemini-free"
+embed = "ollama-embed"
+# Dev split: Gemini's own highlighting scored 37.3 untrimmed vs 36.4 trimmed (it over-trims).
+trim = "off"
+
+[llm.presets.free-api]
+# Free tiers checked 2026-11-09: Gemini Flash / Flash-Lite and gemini-embedding are free
+# with per-project daily limits (see aistudio.google.com/rate-limit). Google may use
+# free-tier prompts to improve its products.
+default = "gemini-free"
+embed = "gemini-embed"
+
+# ---- backends ------------------------------------------------------------------------
+[llm.backends.ollama]
+type = "ollama"
+base_url = "http://localhost:11434"
+model = "qwen3.8:27b-q4_K_M"   # GGUF build: Ollama enforces the JSON schema
+think = false                  # thinking on is 5-10x slower per call
+num_ctx = 16384
+temperature = 0.0
+
+[llm.backends.ollama-think]
+# Same model with thinking on, for a single stage (e.g. --stage highlight=ollama-think).
+type = "ollama"
+base_url = "http://localhost:11434"
+model = "qwen3.8:27b-q4_K_M"
+think = true
+num_ctx = 16384
+temperature = 0.0
+
+[llm.backends.ollama-embed]
+type = "ollama"
+base_url = "http://localhost:11434"
+model = "qwen3-embedding:0.6b"
+
+[llm.backends.lmstudio]
+# Any local OpenAI-compatible server: LM Studio (:1234), llama.cpp llama-server (:8080),
+# mlx_lm.server (:8080; no schema enforcement, so set structured = "none").
+type = "openai_compat"
+base_url = "http://localhost:1234/v1"
+model = ""
+is_local = true
+is_free = true
+
+[llm.backends.anthropic]
+type = "anthropic"
+model = "claude-opus-5-5"
+effort = "low"            # low | medium | high | xhigh | max (thinking is always on for this model)
+api_key_env = "ANTHROPIC_API_KEY"
+fallbacks = "default"     # server-side refusal fallback (beta server-side-fallback-2026-07-01)
+
+[llm.backends.gemini-free]
+type = "gemini"
+model = "gemini-3.5-flash-lite"
+api_key_env = "GEMINI_API_KEY"
+thinking_level = "low"
+is_free = true
+rpm = 10
+
+[llm.backends.gemini]
+type = "gemini"
+model = "gemini-3.8-flash"
+api_key_env = "GEMINI_API_KEY"
+thinking_level = "low"
+
+[llm.backends.gemini-embed]
+type = "gemini"
+model = "gemini-embedding-001"
+api_key_env = "GEMINI_API_KEY"
+is_free = true
+
+[llm.backends.openai]
+type = "openai_compat"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+model = ""                # set a model ID to use OpenAI
+
+[llm.backends.openrouter]
+type = "openai_compat"
+base_url = "https://openrouter.ai/api/v1"
+api_key_env = "OPENROUTER_API_KEY"
+model = ""
+
+[llm.backends.groq]
+type = "openai_compat"
+base_url = "https://api.groq.com/openai/v1"
+api_key_env = "GROQ_API_KEY"
+model = ""
+rpm = 25
+
+# USD per 1M tokens (thinking tokens bill as output). Checked 2026-11-09.
+[llm.pricing]
+"claude-opus-5-5" = { input = 4.00, output = 20.00 }
+"claude-sonnet-5-5" = { input = 2.00, output = 10.00 }
+"claude-haiku-5-5" = { input = 0.10, output = 0.50 }
+"gemini-3.8-flash" = { input = 0.75, output = 3.75 }
+"gemini-3.5-flash-lite" = { input = 0.30, output = 2.50 }
+"gemini-4-argon" = { input = 2.00, output = 10.00 }
+"gemini-embedding-001" = { input = 0.15, output = 0.0 }
+
+# Expected output tokens per call, for cost estimates before a run (includes thinking).
+[llm.est_output_tokens]
+queries = 200
+screen = 500
+locate = 600
+underline = 900
+highlight = 900
+trim = 400
+emphasis = 600
+tag = 400
+readback = 400
+intent = 250
+quals = 300
+
+[corpus]
+examples_dir = "examples"
+cards_path = "data/cards.jsonl"
+stats_json = "data/stats.json"
+stats_md = "data/stats.md"
+
+[cut]
+# tight | normal | long: how much to underline and highlight. Targets come from the
+# corpus percentiles (p25 / median / p75 of 970 cards).
+# 2026-11-11 feedback on the overnight cards: "way too short", "badly cut", "don't box so much".
+# So: long windows, the "long" density (about what the longer-card example files read: ~50
+# words of a 383-word card), highlighting in readable phrases (highlight_fluent.md) with no trim, and a
+# few short boxes. The old compressed style: density = "normal", highlight_prompt = "highlight",
+# trim_highlight = true, min/max_window_words = 150 / 650.
+density = "long"
+highlight_prompt = "highlight_fluent"
+emphasis = true
+# Boxes: at most emphasis_share x the highlighted words, in boxes of emphasis_box_words words
+# (one more for a number), only on highlighted words. Your files box ~50% of highlighted words.
+# 0.15 -> 0.10 on 2026-11-12: at 0.15 the model filled the cap (9 boxed of 58 read words).
+emphasis_share = 0.10
+emphasis_box_words = 2
+tag = true
+# Longest window the locate stage may pick (corpus: median card 257 words, p90 1203; per-file
+# medians range from 383 to 1307 words).
+max_window_words = 900
+# Shorter windows get neighboring paragraphs until they reach this.
+min_window_words = 350
+# A card runs from its first underlined paragraph to its last: whole unmarked paragraphs at
+# either edge are dropped (your files leave a median 3% of the body plain after the last underline).
+drop_unmarked_edges = true
+acronym_rule = true       # "marine protected areas (MPAs)" -> highlight the initials
+# Trim: after highlighting, a deletion-only pass cuts the highlight down to this team's short
+# pieces (the model may only drop highlighted words; "not"/"only"/"few" are put back if dropped).
+# Dev split, local model, like-for-like: highlight F1 37.4 -> 39.7, emphasis 25.1 -> 27.9,
+# underline unchanged; highlighted share of the card 18.1% -> 10.8% (your team: 9.8%). ~35 s/card.
+trim_highlight = false     # off since the 2026-11-11 feedback: trimmed cards read too short and choppy
+# With the trim off, a highlight over trim_if_over x its target is cut back. 0 = never.
+# trim_over_mode = "rank": the model ranks the read sentences (trim_rank.md) and the code keeps
+# whole sentences, most needed first, up to trim_rank_slack x the target. "words": the model
+# picks the words to keep (trim_fluent.md); it kept 117 words of a 49-word target (2026-11-12).
+trim_if_over = 1.5
+trim_over_mode = "rank"
+trim_rank_slack = 1.2
+# Smooth: after highlighting, the model may add a few words of the same sentence (underlined or
+# not; added words get underlined) where a read piece has no subject or no verb: "possesses
+# 2,000 tactical nukes" -> "Russia possesses 2,000 tactical nukes". At most smooth_share x the
+# highlighted words. ~15 s per card. (2026-11-11)
+smooth = true
+smooth_share = 0.2
+# Repair: after the trim, the model may add back a few dropped words (at most repair_share of
+# the words kept, only words highlighted before the trim) so each piece reads as a clause:
+# "obligations made up 9.3 percent", "has no plans to forward-deploy". Dev split, local model:
+# highlight F1 39.7 -> 40.1 (better on 5 cards, worse on 3), ~9 s more per card (2026-11-11).
+trim_repair = true
+repair_share = 0.3
+# Underline top-up: when the first underline is under topup_below x the target, ask the model
+# for the missing claim/warrant/impact ranges (up to topup_goal x the target). Off: on the 15
+# dev cards it fired on, it put more of your team's highlighting inside the underline (44% ->
+# 55%) but highlight F1 still fell 37.2 -> 35.9, at ~45 s more per card (2026-11-10).
+# On since 2026-11-12: with the longer cards, the first underline often stopped halfway and
+# left the strongest quote at the end plain (the reviewer's taste now outranks F1).
+underline_topup = true
+topup_below = 0.55
+topup_goal = 0.75
+# Also top up when paragraphs with nothing underlined hold this share of the card's words: the
+# model is shown them and underlines any that give a warrant or impact (the rest are dropped
+# from the card's edges, or stay plain inside it).
+topup_plain_share = 0.25
+# Underline a gap of up to this many plain words between two underlined words of one sentence
+# ("It has an estimated range", not "It _ an _ range"; the model sometimes returns one-word ranges).
+underline_fill_gaps = 1
+# A read piece starting with a helping or reporting verb ("has exposed", "concludes that") gets
+# the short subject that opens its sentence (up to 6 words); a read piece of 3+ words that stops
+# one word before its sentence ends ("fracture the NATO" + "alliance.") gets that word.
+restore_subjects = true
+finish_sentences = true
+# Unhighlight a sentence whose highlighted words mostly repeat an earlier highlighted point
+# (0.9% of your 966 highlighted cards do this).
+drop_repeats = true
+# Fill a gap of up to this many underlined words between two highlighted words of one sentence
+# (not a gap of only "a/an/the"): "Ukraine shows no signs of capitulating", "Neither side can
+# rely". Offline on saved cuts: dev 39.7 -> 40.6 highlight F1, rest 38.1 -> 39.5; highlighted
+# share 10.9% -> 12.2% (your team on those cards: 11.8%). 0 = off. (2026-11-11)
+bridge_gaps = 2
+# A highlighted "not"/"isn't"/"no" whose word is left unread: highlight the words up to it if
+# they're underlined ("would not go off"); else drop the piece if nothing is read soon after
+# ("the goal isn't ... Russia at a disadvantage" flips the article). Fired on 2-4 of 30-40 saved
+# cuts per split; highlight F1 unchanged (+-0.1). (2026-11-11)
+dangling_negators = true
+# Author's-view check: after cutting, the model reads the article's framing and says whether the
+# author endorses, qualifies, or disputes the card's claim (catches "critics argue X... we found
+# no evidence of X" cards). Auto mode never uses a disputed card. About 20 s per card locally.
+author_check = true
+author_check_words = 2200  # how much of the article the check reads (opening, conclusions, end)
+
+# Word targets follow the example cards: words = coef * (card words) ^ exp, fit on 852
+# cards (tight / normal / long = 25th / 50th / 75th percentile around the fit). Cutters
+# underline and highlight proportionally less of longer cards: at 150 / 300 / 600 words,
+# "normal" underlines about 61 / 95 / 148 words and highlights about 25 / 33 / 44.
+[cut.densities.tight]
+underline = [1.74, 0.639]
+highlight = [2.48, 0.409]
+emphasis_pct = 20         # emphasized / underlined words
+
+[cut.densities.normal]
+underline = [2.49, 0.639]
+highlight = [3.23, 0.409]
+emphasis_pct = 26
+
+[cut.densities.long]
+underline = [3.35, 0.639]
+highlight = [4.25, 0.409]
+emphasis_pct = 33
+
+[retrieval]
+# Few-shot examples: the k most similar human-cut cards, embedded with the `embed` backend.
+enabled = true
+k = 4
+example_format = "markup"   # markup ([[highlight]] _underline_ <E>emphasis</E>) | indexed
+index_path = "data/index.npz"
+# Prompt budget for backends without a known context window (API models).
+max_prompt_tokens = 24000
+
+[search]
+# Automatic source finding (`cardcutter auto`, the "Find sources" button). All free, no keys:
+# web and news results via the ddgs metasearch library, scholarly open-access works via OpenAlex.
+providers = ["web", "news", "openalex"]
+queries = 4                 # search queries the model writes from the claim
+results_per_query = 8
+region = "us-en"
+max_fetch = 14              # usable articles to download and read per run
+min_words = 250             # skip pages shorter than this (stubs, paywalls)
+fetch_timeout = 20
+max_age_years = 0           # 0 = any age; e.g. 5 keeps only the last five years (OpenAlex only)
+min_relevance = 0.0         # drop sources whose best passage scores below this (0-1)
+max_cut_attempts = 8        # sources to try before giving up on reaching the card count
+screen_top = 8              # sources per stance check (does it argue the claim?)
+screen_max = 24             # sources checked per search round; only those that argue the claim are cut
+rounds = 2                  # search again with new queries when too few sites argue the claim
+cards = 3                   # cards per run, each from a different site
+# Ask the judge whether each card, read aloud, is evidence for the claim you searched for (not
+# just its own tag; prompt claimcheck.md): 1-2/5 drops the card, 3/5 holds it in reserve.
+# One extra judge call per card (~15 s).
+claim_check = true
+# Split the claim into the parts a card must show (claimparts.md: "arms to Ukraine drain US
+# stockpiles" + "those stockpiles are needed for Taiwan"), and have the claim check say which
+# parts each card shows. A card that never shows one part is held in reserve while auto mode
+# looks for a card that proves the whole claim; if none turns up, the reserves fill in, a card
+# showing a part no other card shows first, with a warning naming the missing part.
+claim_parts = true
+# Second search: when link_after cards have failed the claim check (or the sources ran out after
+# one did), search once more with queries aimed at what those cards lack (the part no card
+# shows, or the tie between the parts), and cut the new sources first, with up to link_tries
+# more attempts. Adds a search round (~3-5 min) plus those cuts, only on claims that need it.
+link_search = true
+link_after = 3
+link_tries = 4
+# Not cuttable as evidence, or blocks automated reading.
+blocked_domains = ["wikipedia.org", "reddit.com", "quora.com", "youtube.com", "facebook.com",
+                   "x.com", "twitter.com", "tiktok.com", "instagram.com", "pinterest.com",
+                   "linkedin.com", "amazon.com", "researchgate.net", "scribd.com", "coursehero.com",
+                   "chegg.com", "studocu.com", "academia.edu", "medium.com"]
+
+[readback]
+# Read the highlighted text aloud and score grammar / sense / proves-the-tag from 1 to 5.
+# Calibration (2026-11-10): with the local 27B model and no thinking, the judge passes only
+# 4 of 12 of this team's own cards at "every score >= 4" and barely separates human cuts
+# (2.75 avg) from model cuts (2.5). So it re-cuts only on clear failures (a score <= 2)
+# and only once; its scores are shown as information.
+# Re-cuts (2026-11-10) are a coin flip: on dev, choosing only between the trimmed and
+# untrimmed first cut scored highlight F1 39.8 vs 38.5 with re-cuts allowed; on test the
+# re-cuts gained about 1 point. Off by default because they double the time per failed card;
+# set max_retries = 1 to allow one re-cut again. See REPORT-2026-11-10.md, "Evening".
+enabled = true
+min_score = 3
+# 2026-11-12: one re-cut again, now that the read-back judges fluency (the new target) and most
+# cards pass: it fires only on a clear failure (a score <= 2), about 1 card in 10 on the re-cut set.
+max_retries = 1
+# Hear the untrimmed highlight when the trimmed one fails, and keep the better-scoring one.
+# Off (2026-11-10): the judge prefers the long untrimmed highlighting on exactly the cards the
+# model over-highlights most (26-67% of words); keeping the trim tied on dev (39.7 vs 39.8)
+# and scored 36.3 vs 33.5 on test, at the team's amount of highlighting.
+untrimmed_fallback = false
+# When re-cuts are on and a failed read-back says the card doesn't prove the tag or make
+# sense, redo the underlining too (not just the highlighting).
+reunderline = true
+
+[eval]
+# Give the cutter the card's place in the file (pocket > hat > block) and the previous
+# card's tag, as a debater would have; many tags ("And HIMARs.") continue the one before.
+file_context = true
+holdout_size = 100
+holdout_path = "data/holdout.json"
+runs_dir = "data/eval_runs"
+reports_dir = "eval/reports"
+
+[render]
+# The template is built from this file's styles.xml (`cardcutter corpus template`).
+template_source = "examples/your-file.docx"   # any Verbatim file in examples/
+template_path = "data/template.docx"
+# Verbatim highlight color for new cards: yellow or cyan, whichever your files use.
+highlight_color = "yellow"
+# Font size, in points, for text that is not underlined. 8 pt is what every example
+# file uses most (some go down to 2-4 pt).
+shrink_unread_pt = 8
+
+[cite]
+# "inline" (805 of the 970 example cards) or "bracketed" (62 cards).
+default_format = "inline"
+# Bracketed cites end with the cutter's name.
+cutter_name = ""
+# Written in place of a field the article doesn't state (never invented).
+missing_marker = "[{field}?]"
+# Ask the model to copy author qualifications from the byline / author note (verified
+# against the article text; anything not found word for word is dropped).
+extract_quals = true
+
+[verify]
+# Allow the card to end mid-sentence, as some example cards do.
+allow_mid_sentence_end = true
+# Highlight and emphasis must sit inside underline. Corpus: 99.8% of highlighted chars
+# and all but one card's emphasis are inside underline; the rest are stray commas.
+require_highlight_in_underline = true
+require_emphasis_in_underline = true

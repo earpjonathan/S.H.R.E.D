@@ -1,0 +1,21 @@
+# Never commit evidence, generated cards, eval reports or secrets. Everything
+# is ignored by default and only code, tests and docs are let back in. To track
+# a new top-level file or folder, add a "!" line for it below.
+/*
+
+!/.gitignore
+!/README.md
+!/LICENSE
+!/pyproject.toml
+!/uv.lock
+!/.python-version
+!/.env.example
+!/config.toml
+!/src/
+!/tests/
+
+__pycache__/
+*.py[oc]
+.DS_Store
+*.docx
+!tests/fixtures/*.docx
